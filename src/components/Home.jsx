@@ -1,9 +1,48 @@
-// src/components/Home.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { auth } from "../firebaseConfig";
-import "./Home.css";
+import "./Home.css"; // Ensure this path is correct
+
+// Sub-component for a single recipe card (improves readability)
+const RecipeCard = ({ recipe, onClick }) => {
+  const defaultImageUrl = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80";
+  const stars = recipe.stars || 5;
+  const roundedStars = Math.round(stars);
+  const displayStars = Array(roundedStars).fill().map((_, i) => <span key={i}>⭐</span>);
+
+  return (
+    <div
+      className="recipe-card clickable"
+      onClick={onClick}
+      tabIndex={0}
+    >
+      <img
+        src={recipe.imageUrl || defaultImageUrl}
+        alt={recipe.title}
+      />
+      <div className="card-content">
+        <h2>{recipe.title}</h2>
+        <div className="stars">
+          {displayStars}
+          <span className="star-num">{stars.toFixed(1)}</span>
+        </div>
+        <div className="desc">
+          {recipe.description && recipe.description.length > 60
+            ? recipe.description.slice(0, 60) + "..."
+            : recipe.description}
+        </div>
+        <div className="tags">
+          {recipe.veg ? (
+            <span className="tag veg">🌱 Veg</span>
+          ) : (
+            <span className="tag nonveg">🍗 Non-Veg</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function Home() {
   const [recipes, setRecipes] = useState([]);
@@ -13,37 +52,52 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
 
+  // --- Effects ---
+
   // Listen to auth state
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(user => setCurrentUser(user));
-    return unsub;
+    return () => unsub(); // Cleanup function
   }, []);
 
+  // Fetch recipes
   useEffect(() => {
     api.get("/recipes")
       .then(res => {
         setRecipes(res.data);
-        setFilteredRecipes(res.data);
+        // Initial filtering/setting done by the next effect
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("Failed to fetch recipes:", error);
         setRecipes([]);
-        setFilteredRecipes([]);
       });
   }, []);
 
+  // Filter recipes based on filter/search state
   useEffect(() => {
     let temp = [...recipes];
+
+    // 1. Apply category filter
     if (filter === "veg") temp = temp.filter(r => r.veg);
     else if (filter === "nonveg") temp = temp.filter(r => !r.veg);
     else if (filter === "top") temp = temp.filter(r => (r.stars || 0) >= 4.8);
 
+    // 2. Apply search filter
     if (search)
       temp = temp.filter(r =>
         r.title.toLowerCase().includes(search.toLowerCase()) ||
         (r.description && r.description.toLowerCase().includes(search.toLowerCase()))
       );
+
     setFilteredRecipes(temp);
   }, [recipes, filter, search]);
+
+  // --- Render Helpers ---
+
+  const defaultProfileIcon = "https://img.icons8.com/fluency/48/000000/user-male-circle--v1.png";
+  const profileImageSrc = currentUser && currentUser.photoURL ? currentUser.photoURL : defaultProfileIcon;
+  const profileAltText = currentUser ? "User Profile" : "Default Profile";
+
 
   return (
     <div className="home-bg">
@@ -55,7 +109,7 @@ export default function Home() {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div className="user-menu" style={{display:"flex", alignItems:"center", gap:"12px"}}>
+        <div className="user-menu" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <button
             onClick={() => navigate("/profile")}
             style={{
@@ -68,24 +122,15 @@ export default function Home() {
             }}
             title="My Profile"
           >
-            {currentUser && currentUser.photoURL ? (
-              <img
-                src={currentUser.photoURL}
-                alt="Profile"
-                width={38}
-                style={{ borderRadius: "50%" }}
-              />
-            ) : (
-              <img
-                src="https://img.icons8.com/fluency/48/000000/user-male-circle--v1.png"
-                alt="Profile"
-                width={38}
-                style={{ borderRadius: "50%" }}
-              />
-            )}
+            <img
+              src={profileImageSrc}
+              alt={profileAltText}
+              width={38}
+              style={{ borderRadius: "50%", minWidth: "38px" }}
+            />
             <span style={{
               marginLeft: "9px",
-              color: "#684a03",
+              color: "#684a03", // This will be overridden by CSS
               fontWeight: 600,
               fontSize: "1em"
             }}>Profile</span>
@@ -95,50 +140,22 @@ export default function Home() {
 
       <div className="home-main">
         <aside className="home-sidebar">
-          <button className={`filter-btn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>All</button>
-          <button className={`filter-btn ${filter === "veg" ? "active" : ""}`} onClick={() => setFilter("veg")}>🌱 Veg</button>
-          <button className={`filter-btn ${filter === "nonveg" ? "active" : ""}`} onClick={() => setFilter("nonveg")}>🍗 Non-Veg</button>
-          <button className={`filter-btn ${filter === "top" ? "active" : ""}`} onClick={() => setFilter("top")}>⭐ Top Rated</button>
+          <button className={`filter-btn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>All Recipes</button>
+          <button className={`filter-btn ${filter === "veg" ? "active" : ""}`} onClick={() => setFilter("veg")}>🌱 Vegetarian</button>
+          <button className={`filter-btn ${filter === "nonveg" ? "active" : ""}`} onClick={() => setFilter("nonveg")}>🍗 Non-Vegetarian</button>
+          <button className={`filter-btn ${filter === "top" ? "active" : ""}`} onClick={() => setFilter("top")}>⭐ Top Rated (4.8+)</button>
         </aside>
 
         <main className="recipe-feed">
           {filteredRecipes.length === 0 ? (
-            <p className="no-results">No recipes found. Be the first to post!</p>
+            <p className="no-results">No recipes found matching your criteria. Be the first to post!</p>
           ) : (
             filteredRecipes.map(recipe => (
-              <div
+              <RecipeCard
                 key={recipe.id}
-                className="recipe-card clickable"
+                recipe={recipe}
                 onClick={() => navigate(`/recipe/${recipe.id}`)}
-                tabIndex={0}
-              >
-                <img
-                  src={
-                    recipe.imageUrl ||
-                    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80"
-                  }
-                  alt={recipe.title}
-                />
-                <div className="card-content">
-                  <h2>{recipe.title}</h2>
-                  <div className="stars">
-                    {Array(Math.round(recipe.stars || 5))
-                      .fill()
-                      .map((_, i) => (
-                        <span key={i}>⭐</span>
-                      ))}{" "}
-                    <span className="star-num">{recipe.stars ? recipe.stars.toFixed(1) : "5.0"}</span>
-                  </div>
-                  <div className="desc">{recipe.description.slice(0, 60)}{recipe.description.length > 60 ? "..." : ""}</div>
-                  <div className="tags">
-                    {recipe.veg ? (
-                      <span className="tag veg">🌱 Veg</span>
-                    ) : (
-                      <span className="tag nonveg">🍗 Non-Veg</span>
-                    )}
-                  </div>
-                </div>
-              </div>
+              />
             ))
           )}
         </main>
@@ -146,16 +163,16 @@ export default function Home() {
         <aside className="home-widgets">
           <div className="widget trending">
             <h4>Trending 🔥</h4>
-            <p>Top recipes soon!</p>
+            <p>Check back soon for the hottest recipes!</p>
           </div>
           <div className="widget new">
             <h4>New Recipes</h4>
-            <p>Latest recipes soon!</p>
+            <p>The latest additions to the RecipeVerse!</p>
           </div>
         </aside>
       </div>
 
-      <a href="/create-recipe">
+      <a href="/create-recipe" title="Add New Recipe">
         <button className="fab">＋</button>
       </a>
     </div>

@@ -6,10 +6,11 @@ import "./CreateRecipe.css";
 
 // Helper function to simulate image upload (replace with actual storage logic)
 const uploadImageAndGetUrl = async (imageFile) => {
-    if (!imageFile) return null;
-
-    // Generate a unique URL for each selected image
-    return URL.createObjectURL(imageFile);
+    if (imageFile) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=500&auto=format&fit=crop";
+    }
+    return null;
 };
 
 

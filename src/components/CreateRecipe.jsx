@@ -3,14 +3,21 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { auth } from "../firebaseConfig";
 import "./CreateRecipe.css";
+import { storage } from "../firebaseConfig";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
 
 // Helper function to simulate image upload (replace with actual storage logic)
 const uploadImageAndGetUrl = async (imageFile) => {
     if (!imageFile) return null;
 
-    // Generate a unique URL for each selected image
-    return URL.createObjectURL(imageFile);
+    const filePath = `recipes/${Date.now()}-${imageFile.name}`;
+    const imageRef = ref(storage, filePath);
+
+    await uploadBytes(imageRef, imageFile);
+    return await getDownloadURL(imageRef);
 };
+
 
 
 export default function CreateRecipe() {

@@ -1,7 +1,7 @@
 // src/firebaseConfig.js
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-
+import { getStorage } from "firebase/storage";
 const firebaseConfig = {
   apiKey: "AIzaSyAEpZ56WrFO3ZI0aDiPixBr-tpyXTTthXc",
   authDomain: "recipeapp-72f2e.firebaseapp.com",
@@ -16,3 +16,4 @@ const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
 export { auth, googleProvider };
+export const storage = getStorage(app);

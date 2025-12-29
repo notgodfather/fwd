@@ -33,52 +33,71 @@ export default function MyProfile() {
     const [favorites, setFavorites] = useState([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
-    const user = auth.currentUser;
+    const [user, setUser] = useState(null);
+const [authLoading, setAuthLoading] = useState(true);
+useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(currentUser => {
+        setUser(currentUser);
+        setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+}, []);
+
 
     useEffect(() => {
-        const fetchProfile = async () => {
-            if (!user) {
-                setLoading(false);
-                return;
-            }
-            try {
-                // Fetch user data (favorites list)
-                const userRes = await api.get(`/recipes/user/${user.uid}`);
-                const fetchedUserData = userRes.data || {};
-                setUserData(fetchedUserData);
-
-                // Fetch all recipes
-                const recipeRes = await api.get("/recipes");
-                const allRecipes = recipeRes.data || [];
-
-                // Filter by authorID for "My Recipes"
-                const userRecipes = allRecipes.filter(x => x.authorID === user.uid);
-                setMyRecipes(userRecipes);
-
-                // Filter favorites
-                const favIds = fetchedUserData.favorites || [];
-                const favRecipes = allRecipes.filter(x => favIds.includes(x.id));
-                setFavorites(favRecipes);
-
-            } catch (err) {
-                console.error("Error fetching profile data:", err);
-                // Even on error, we know the basic Firebase user data
-                setUserData({});
-            }
+    const fetchProfile = async () => {
+        if (!user) {
             setLoading(false);
-        };
-        fetchProfile();
-    }, [user]);
+            return;
+        }
+
+        try {
+            // 1️⃣ Fetch all recipes
+            const recipeRes = await api.get("/recipes");
+            const allRecipes = recipeRes.data || [];
+
+            // 2️⃣ My posted recipes
+            const userRecipes = allRecipes.filter(
+                r => r.authorID === user.uid
+            );
+            setMyRecipes(userRecipes);
+
+            // 3️⃣ FAVORITES (FROM localStorage)
+            const favKey = `favorites_${user.uid}`;
+            const favIds = JSON.parse(localStorage.getItem(favKey)) || [];
+
+            const favRecipes = allRecipes.filter(
+                r => favIds.includes(r.id)
+            );
+            setFavorites(favRecipes);
+
+        } catch (err) {
+            console.error("Error fetching profile data:", err);
+        }
+
+        setLoading(false);
+    };
+
+    fetchProfile();
+}, [user]);
+
 
     const handleLogout = () => {
         auth.signOut();
         navigate("/"); // Redirect to landing page
     };
 
-    if (loading) return <div className="loading-message">Loading profile...</div>;
-    
-    // Check for user existence after loading
-    if (!user) return <div className="no-user-message">Please log in with Google to view your profile.</div>;
+    if (authLoading || loading) {
+    return <div className="loading-message">Loading profile...</div>;
+}
+
+if (!user) {
+    return <div className="no-user-message">
+        Please log in with Google to view your profile.
+    </div>;
+}
+
 
     const recipeCount = myRecipes.length;
     const favoriteCount = favorites.length;

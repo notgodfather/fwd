@@ -4,6 +4,52 @@ import api from "../api";
 import { auth } from "../firebaseConfig";
 import "./RecipeDetail.css";
 
+/* ---------- Nutrition Data (per 100g, approx) ---------- */
+const NUTRITION_TABLE = {
+  onion: { calories: 40, protein: 1.1, carbs: 9, fat: 0.1 },
+  tomato: { calories: 18, protein: 0.9, carbs: 3.9, fat: 0.2 },
+  rice: { calories: 130, protein: 2.7, carbs: 28, fat: 0.3 },
+  oil: { calories: 884, protein: 0, carbs: 0, fat: 100 },
+  potato: { calories: 77, protein: 2, carbs: 17, fat: 0.1 },
+  egg: { calories: 155, protein: 13, carbs: 1.1, fat: 11 },
+  chicken: { calories: 239, protein: 27, carbs: 0, fat: 14 },
+  paneer: { calories: 265, protein: 18, carbs: 1.2, fat: 20 },
+};
+
+const calculateNutrition = (ingredients) => {
+  let total = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+
+  ingredients.forEach((ing) => {
+    const key = ing.toLowerCase();
+    if (NUTRITION_TABLE[key]) {
+      const d = NUTRITION_TABLE[key];
+      const portion = key === "oil" ? 0.1 : 0.5; // oil 10g, others 50g
+      total.calories += d.calories * portion;
+      total.protein += d.protein * portion;
+      total.carbs += d.carbs * portion;
+      total.fat += d.fat * portion;
+    }
+  });
+
+  return {
+    calories: Math.round(total.calories),
+    protein: Math.round(total.protein),
+    carbs: Math.round(total.carbs),
+    fat: Math.round(total.fat),
+  };
+};
+
+const calculateHealthScore = (n) => {
+  let score = 10;
+  let reason = "Balanced recipe";
+
+  if (n.fat > 25) { score -= 2; reason = "High fat content"; }
+  if (n.carbs > 60) { score -= 1.5; reason = "High carbohydrates"; }
+  if (n.protein < 10) { score -= 1; reason = "Low protein"; }
+
+  return { score: score.toFixed(1), reason };
+};
+
 export default function RecipeDetail() {
     const { id } = useParams();
     const [recipe, setRecipe] = useState(null);
@@ -52,6 +98,12 @@ export default function RecipeDetail() {
             }
         };
         fetchRecipe();
+        if (currentUser) {
+    const key = `favorites_${currentUser.uid}`;
+    const stored = JSON.parse(localStorage.getItem(key)) || [];
+    setIsFavorite(stored.includes(id));
+}
+
     }, [id, currentUser]);
 
     // Submit rating
@@ -76,23 +128,30 @@ export default function RecipeDetail() {
         }
     };
 
-    // Toggle favorite status
-    const handleToggleFavorite = async () => {
-        if (!currentUser) {
-            alert("Please log in to manage favorites!");
-            return;
-        }
-        try {
-            await api.patch(`/recipes/${id}/favorite`, {
-                userId: currentUser.uid,
-                isFavorite: !isFavorite // Toggle status
-            });
-            setIsFavorite(!isFavorite);
-            alert(`Recipe ${!isFavorite ? 'added to' : 'removed from'} favorites!`);
-        } catch (err) {
-            alert("Failed to update favorites.");
-        }
-    };
+  const handleToggleFavorite = () => {
+    if (!currentUser) {
+        alert("Please log in to manage favorites!");
+        return;
+    }
+
+    const userId = currentUser.uid;
+    const key = `favorites_${userId}`;
+
+    const stored = JSON.parse(localStorage.getItem(key)) || [];
+    let updatedFavorites;
+
+    if (stored.includes(id)) {
+        updatedFavorites = stored.filter(rid => rid !== id);
+        alert("Recipe removed from favorites!");
+    } else {
+        updatedFavorites = [...stored, id];
+        alert("Recipe added to favorites!");
+    }
+
+    localStorage.setItem(key, JSON.stringify(updatedFavorites));
+    setIsFavorite(updatedFavorites.includes(id));
+};
+
 
     if (loading) return <div className="detail-bg loading-page"><p>Loading recipe details...</p></div>;
     if (!recipe) return <div className="detail-bg loading-page"><p>Recipe not found. It may have been removed.</p></div>;
@@ -103,7 +162,9 @@ export default function RecipeDetail() {
     // Assuming ingredients and steps are arrays/newline separated strings
     const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : recipe.ingredients?.split(',').map(i => i.trim()).filter(i => i) || [];
     const steps = Array.isArray(recipe.steps) ? recipe.steps : recipe.steps?.split('\n').map(s => s.trim()).filter(s => s) || [];
-    
+    const nutrition = calculateNutrition(ingredients);
+const health = calculateHealthScore(nutrition);
+
     return (
         <div className="detail-bg">
             <header className="detail-header">
@@ -177,7 +238,24 @@ export default function RecipeDetail() {
                         </ol>
                     </div>
                 </section>
+                <div className="nutrition-col detail-col">
+  <h2>Nutrition (Estimated)</h2>
 
+  <p>🔥 Calories: <b>{nutrition.calories} kcal</b></p>
+  <p>💪 Protein: <b>{nutrition.protein} g</b></p>
+  <p>🍞 Carbs: <b>{nutrition.carbs} g</b></p>
+  <p>🧈 Fat: <b>{nutrition.fat} g</b></p>
+
+  <div className="health-score">
+    <b>Health Score:</b> {health.score}/10
+    <br />
+    <small>{health.reason}</small>
+  </div>
+
+  <small className="nutrition-note">
+    *Estimated values for academic use
+  </small>
+</div>
                 {/* --- User Rating Section --- */}
                 <section className="user-rating-section">
                     <h3>Rate this Recipe</h3>

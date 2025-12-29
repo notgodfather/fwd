@@ -408,3 +408,23 @@ body {
         margin-left: 10px;
     }
 }
+.nutrition-col {
+  background: #fff8e1;
+  border-radius: 12px;
+}
+
+.nutrition-col p {
+  margin: 6px 0;
+}
+
+.health-score {
+  margin-top: 10px;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.nutrition-note {
+  font-size: 0.8rem;
+  color: #777;
+}
+
